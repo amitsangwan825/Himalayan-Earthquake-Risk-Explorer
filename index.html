@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Himalayan Earthquake Risk Explorer</title>
+<meta name="description" content="Interactive map of Himalayan earthquakes from the USGS catalog, drawn over active faults, with charts, regions and a safety guide. Academic project, Lovely Professional University.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="ack" id="ack">
+  <div class="wrap">
+    <img id="lpuLogo" src="assets/lpu-logo.png" alt="Lovely Professional University logo" hidden onload="this.hidden=false" onerror="this.remove()">
+    <span>Academic project developed at <strong>Lovely Professional University</strong>, Phagwara, Punjab, India.</span>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Himalayan Earthquake Risk Explorer, top of page">
+      <svg viewBox="0 0 34 20" aria-hidden="true"><path d="M1 10h6l2-6 3 12 3-16 3 20 3-14 2 4h10"/></svg>
+      <span>Himalayan Earthquake Risk Explorer</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#explore">Map</a>
+      <a href="#patterns">Patterns</a>
+      <a href="#regions">Regions</a>
+      <a href="#faults">Faults</a>
+      <a href="#safety">Safety</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-row">
+        <h1>Where the Himalaya shakes</h1>
+        <div>
+          <p class="lede">Earthquakes along the Himalayan arc from the USGS catalog, drawn over mapped active faults. Pick a time window, filter by size and depth, and open any event.</p>
+          <div class="actions">
+            <a class="btn primary" href="#explore">Open the map</a>
+            <button class="btn" type="button" id="btnHeroFile">Load a USGS file</button>
+          </div>
+        </div>
+      </div>
+
+      <figure class="seis">
+        <canvas id="seis" role="img" aria-label="Seismograph-style trace of the loaded earthquakes over time. Taller spikes are larger earthquakes."></canvas>
+        <figcaption>
+          <span id="seisCap">Each spike is one earthquake. Spike height grows with magnitude.</span>
+          <span id="seisRange" class="mono muted"></span>
+        </figcaption>
+      </figure>
+
+      <dl class="stats" id="stats">
+        <div><dt>Earthquakes shown</dt><dd><span class="big" id="stCount">0</span><span class="sub" id="stCountSub">No data loaded</span></dd></div>
+        <div><dt>Largest</dt><dd><span class="big" id="stMax">–</span><span class="sub" id="stMaxSub">&nbsp;</span></dd></div>
+        <div><dt>Median depth</dt><dd><span class="big" id="stDepth">–</span><span class="sub" id="stDepthSub">&nbsp;</span></dd></div>
+        <div><dt>Most recent</dt><dd><span class="big" id="stLatest">–</span><span class="sub" id="stLatestSub">&nbsp;</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section" id="explore">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Earthquake map</h2>
+        <p>Drag to pan, scroll or pinch to zoom, and click a circle for the event record. Circles are sized by magnitude. Every filter updates the charts and tables below.</p>
+      </div>
+
+      <div class="databar">
+        <div class="seg" id="presets" role="radiogroup" aria-label="Time window"></div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <button class="btn small" type="button" id="btnFile">Load a USGS file</button>
+        <input type="file" id="fileInput" accept=".csv,.json,.geojson,.txt,text/csv,application/json" hidden>
+      </div>
+
+      <div class="explorer">
+        <aside class="panel" aria-label="Filters">
+          <div class="head"><h3>Filters</h3><button class="linkbtn" type="button" id="btnReset">Reset</button></div>
+
+          <div class="field">
+            <label for="q">Search place</label>
+            <input class="inp" id="q" type="search" placeholder="Nepal, Kashmir, Bharatpur…" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="minMag">Minimum magnitude <output id="minMagOut">–</output></label>
+            <input id="minMag" type="range" min="0" max="10" step="0.1" value="0" disabled>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="lblClass">Magnitude class</span>
+            <div class="chips" id="classChips" role="group" aria-labelledby="lblClass"></div>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="lblDepth">Depth</span>
+            <div class="chips" id="depthChips" role="group" aria-labelledby="lblDepth"></div>
+          </div>
+
+          <div class="field" id="yearBox" hidden>
+            <span class="lbl">Years <output id="yearOut">–</output></span>
+            <label class="sr" for="yFrom">From year</label>
+            <input id="yFrom" type="range" min="1900" max="2026" step="1" value="1900">
+            <label class="sr" for="yTo">To year</label>
+            <input id="yTo" type="range" min="1900" max="2026" step="1" value="2026">
+          </div>
+
+          <div class="field">
+            <label for="region">Region</label>
+            <select class="inp" id="region"></select>
+          </div>
+
+          <div class="field">
+            <span class="lbl" id="lblColor">Colour circles by</span>
+            <div class="mini" role="radiogroup" aria-labelledby="lblColor">
+              <label><input type="radio" name="colorBy" value="mag" checked><span>Magnitude</span></label>
+              <label><input type="radio" name="colorBy" value="depth"><span>Depth</span></label>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="lbl">Map layers</span>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="lyFaults" checked> Active faults</label>
+              <label class="check"><input type="checkbox" id="lyWater" checked> Rivers and lakes</label>
+              <label class="check"><input type="checkbox" id="lyRanges" checked> Mountain ranges</label>
+              <label class="check"><input type="checkbox" id="lyPeaks" checked> Peaks over 6,000 m</label>
+              <label class="check"><input type="checkbox" id="lyCities" checked> Cities</label>
+              <label class="check"><input type="checkbox" id="lyGrid" checked> Latitude and longitude</label>
+              <label class="check" id="tilesRow" hidden><input type="checkbox" id="lyTiles"> Terrain basemap (online)</label>
+            </div>
+          </div>
+        </aside>
+
+        <div class="map-col">
+          <div class="map-shell" id="shell">
+            <canvas id="map" tabindex="0" role="application" aria-label="Interactive earthquake map. Use arrow keys to pan and plus or minus to zoom. The table of largest events below lists the same data."></canvas>
+            <div class="map-count" id="mapCount"><b>0</b> events</div>
+            <div class="zoom">
+              <button type="button" id="zIn" aria-label="Zoom in">+</button>
+              <button type="button" id="zOut" aria-label="Zoom out">−</button>
+              <button type="button" id="zFit" class="fit" aria-label="Reset the view to the whole region">Fit</button>
+            </div>
+            <div class="legend" id="legend"></div>
+            <div class="attr" id="attr"></div>
+            <div class="hint" id="hint">Click the map, then scroll to zoom</div>
+            <div class="maptip" id="mapTip" hidden></div>
+            <div class="empty" id="empty" hidden>
+              <div class="empty-card">
+                <h3 id="emptyTitle">No earthquake data loaded</h3>
+                <p id="emptyText"></p>
+                <div class="actions">
+                  <button class="btn primary small" type="button" id="btnEmptyFile">Load a USGS file</button>
+                  <button class="btn small" type="button" id="btnRetry" hidden>Try USGS again</button>
+                </div>
+                <details>
+                  <summary>How to get a file from USGS</summary>
+                  <ul id="dlList"></ul>
+                  <p style="margin-top:8px">If a link shows text instead of downloading, save the page as a .csv file. You can also use the USGS <a href="https://earthquake.usgs.gov/earthquakes/search/" target="_blank" rel="noopener">catalog search page</a> and press Download.</p>
+                </details>
+              </div>
+            </div>
+          </div>
+
+          <div class="inspector" id="inspector" hidden></div>
+        </div>
+      </div>
+
+      <div class="subhead">
+        <h3>Largest earthquakes in the current selection</h3>
+        <span class="muted" style="font-size:.88rem" id="topNote"></span>
+      </div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th class="num">Magnitude</th><th>Date (UTC)</th><th>Place</th><th class="num">Depth</th><th>Record</th></tr></thead>
+          <tbody id="topBody"></tbody>
+        </table>
+      </div>
+      <p class="tbl-note">Select a row to find the event on the map. Records open on the USGS event page.</p>
+    </div>
+  </section>
+
+  <section class="section" id="patterns" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Patterns in the record</h2>
+        <p>The three charts follow the filters above. Hover or focus a bar for exact counts, or open the table under each chart.</p>
+      </div>
+      <div class="charts">
+        <article class="chart-card wide">
+          <div><h3>Earthquakes over time</h3><p class="sub" id="subTime">Stacked by magnitude class</p></div>
+          <div class="keyrow" id="keyTime"></div>
+          <div class="chart-host" id="chartTime"></div>
+          <p class="note" id="noteTime"></p>
+          <details class="tv"><summary>View as table</summary><div class="tblwrap"><table><thead id="tvTimeHead"></thead><tbody id="tvTimeBody"></tbody></table></div></details>
+        </article>
+        <article class="chart-card">
+          <div><h3>How big</h3><p class="sub">Earthquakes per half-magnitude step</p></div>
+          <div class="chart-host" id="chartMag"></div>
+          <p class="note" id="noteMag"></p>
+          <details class="tv"><summary>View as table</summary><div class="tblwrap"><table><thead><tr><th>Magnitude</th><th class="num">Earthquakes</th></tr></thead><tbody id="tvMagBody"></tbody></table></div></details>
+        </article>
+        <article class="chart-card">
+          <div><h3>How deep</h3><p class="sub">Earthquakes per 10 km of depth</p></div>
+          <div class="chart-host" id="chartDepth"></div>
+          <p class="note" id="noteDepth"></p>
+          <details class="tv"><summary>View as table</summary><div class="tblwrap"><table><thead><tr><th>Depth</th><th class="num">Earthquakes</th></tr></thead><tbody id="tvDepthBody"></tbody></table></div></details>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="regions" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Regions of the arc</h2>
+        <p>The arc is split into rough latitude and longitude boxes so the record can be compared along its length. Select a card to filter the map to that region.</p>
+      </div>
+      <div class="region-grid" id="regionGrid"></div>
+      <p class="tbl-note">Regions are simple boxes drawn for this project. They are not official or administrative boundaries.</p>
+    </div>
+  </section>
+
+  <section class="section" id="faults" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Faults under the map</h2>
+        <p>The blue lines are active fault traces from the GEM Global Active Faults Database. Switch them on and off in the map layers.</p>
+      </div>
+      <div class="two">
+        <div>
+          <div class="prose">
+            <p>A fault is a fracture where blocks of rock move past each other. In the Himalaya, the Indian plate pushes under Tibet, and much of that push is taken up by thrust faults along the southern foothills. Tibet itself is also pulled apart and sheared by other faults.</p>
+            <p><b>Not every earthquake sits on a mapped line.</b> Some large earthquakes begin on faults that never reach the surface, and mapped traces are simplified. Treat the lines as context, not as a prediction.</p>
+          </div>
+          <div class="ftypes" id="faultLegend">
+            <div class="ftype"><svg viewBox="0 0 64 14" aria-hidden="true"><line x1="2" y1="7" x2="62" y2="7" stroke-width="3" stroke-linecap="round"/></svg><div><b>Thrust or reverse</b>Rock on one side is pushed up and over the other. The Main Frontal Thrust is an example.</div></div>
+            <div class="ftype"><svg viewBox="0 0 64 14" aria-hidden="true"><line x1="2" y1="7" x2="62" y2="7" stroke-width="2" stroke-dasharray="10 5" stroke-linecap="round"/></svg><div><b>Strike-slip</b>Blocks slide sideways past each other. The Karakoram Fault is an example. Oblique faults are shown with this pattern.</div></div>
+            <div class="ftype"><svg viewBox="0 0 64 14" aria-hidden="true"><line x1="2" y1="7" x2="62" y2="7" stroke-width="3" stroke-dasharray="1 6" stroke-linecap="round"/></svg><div><b>Normal</b>The crust is stretched and one block drops. Many of the north-south rifts on the Tibetan Plateau are of this type.</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="tblwrap">
+            <table>
+              <thead><tr><th>Fault zone</th><th>Type</th><th class="num">Traces</th><th>Slip rate (mm per year)</th></tr></thead>
+              <tbody id="zoneBody"></tbody>
+            </table>
+          </div>
+          <p class="tbl-note">Named fault zones inside the map area, from the GEM database. Slip rates are the lowest and highest values reported across a zone's traces, where GEM lists one. A dash means GEM gives no rate.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section band" id="safety">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>When the ground moves</h2>
+        <p>You cannot predict an earthquake, but you can prepare for one. These steps follow the guidance published by national disaster agencies.</p>
+      </div>
+      <div class="dch">
+        <div><span class="n">Step 1</span><div class="w">Drop</div><p>Get down on your hands and knees so the shaking cannot knock you over.</p></div>
+        <div><span class="n">Step 2</span><div class="w">Cover</div><p>Protect your head and neck with your arms. Crawl under a sturdy table if one is within a few steps.</p></div>
+        <div><span class="n">Step 3</span><div class="w">Hold on</div><p>Hold your shelter and move with it until the shaking stops.</p></div>
+      </div>
+      <div class="lists">
+        <div>
+          <h3>Before</h3>
+          <ul>
+            <li>Fix tall furniture, shelves and water heaters to the wall.</li>
+            <li>Pack a bag with water, a torch, a first-aid kit, medicines, a power bank and copies of key documents.</li>
+            <li>Agree on a meeting place with your family and learn how to switch off gas and electricity.</li>
+            <li>Pick a safe spot in every room, away from windows, mirrors and heavy objects that can fall.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>During</h3>
+          <ul>
+            <li>Indoors: stay inside. Do not run for the stairs and do not use a lift.</li>
+            <li>In bed: stay there and cover your head with a pillow.</li>
+            <li>Outdoors: move to open ground, away from buildings, trees and power lines.</li>
+            <li>In a vehicle: stop in a clear place, away from bridges and slopes, and stay inside.</li>
+            <li>On mountain roads and trails: expect falling rock and landslides, and move away from steep slopes.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>After</h3>
+          <ul>
+            <li>Expect aftershocks. Drop, cover and hold on each time.</li>
+            <li>Check yourself and others for injuries and give first aid.</li>
+            <li>If you smell gas or see damaged wiring, switch off the supply and leave.</li>
+            <li>Send text messages instead of calling, so networks stay free for emergencies.</li>
+            <li>Stay out of damaged buildings and off cracked or loosened slopes.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout">
+        <p><strong>In India, dial 112</strong> for police, fire and ambulance. Learn more from the <a href="https://ndma.gov.in/" target="_blank" rel="noopener">National Disaster Management Authority</a>, <a href="https://www.ready.gov/earthquakes" target="_blank" rel="noopener">Ready.gov</a> and <a href="https://www.shakeout.org/dropcoverholdon/" target="_blank" rel="noopener">ShakeOut</a>.</p>
+        <button class="btn no-print" type="button" id="btnPrint">Print safety guide</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="sources">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Sources and method</h2>
+        <p>Every earthquake on this page comes from the USGS catalog. Nothing is estimated, smoothed or invented, and no values are typed in by hand.</p>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Data sources</h3>
+          <ul class="slist">
+            <li><b>Earthquakes: USGS Earthquake Catalog</b>Queried through the <a href="https://earthquake.usgs.gov/fdsnws/event/1/" target="_blank" rel="noopener">FDSN Event Web Service</a> for the box 24°N to 37°N and 72°E to 98°E. Only events typed as earthquakes are requested.</li>
+            <li><b>Faults: GEM Global Active Faults Database</b>Styron, R. and Pagani, M. (2020), <i>Earthquake Spectra</i> 36(1_suppl), <a href="https://doi.org/10.1177/8755293020944182" target="_blank" rel="noopener">doi:10.1177/8755293020944182</a>. Data from the <a href="https://github.com/GEMScienceTools/gem-global-active-faults" target="_blank" rel="noopener">GEM repository</a> under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>. Clipped to the map area, simplified, and fold axes removed.</li>
+            <li><b>Rivers, lakes, coastline, peaks, cities, ranges: Natural Earth</b><a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> vector data (public domain), version 5.2.0-pre, clipped and simplified.</li>
+            <li><b>Official hazard information</b>India: <a href="https://riseq.seismo.gov.in/" target="_blank" rel="noopener">National Center for Seismology</a>. Nepal: <a href="https://www.seismonepal.gov.np/" target="_blank" rel="noopener">National Seismological Centre</a>.</li>
+          </ul>
+          <h3 style="margin-top:28px">The exact queries</h3>
+          <p class="note">Each time window is one request to USGS. You can run these yourself.</p>
+          <div class="queries" id="queryList"></div>
+        </div>
+        <div>
+          <h3>How to read the map</h3>
+          <ul class="slist">
+            <li><b>Magnitude classes</b>Light (4 to 4.9), Moderate (5 to 5.9), Strong (6 to 6.9), Major (7 to 7.9) and Great (8 and above), as used by USGS. Circle area is not proportional to energy. Size grows with magnitude so large events stand out.</li>
+            <li><b>Depth classes</b>Shallow is under 70 km, intermediate is 70 to 300 km, and deep is over 300 km. Shallow earthquakes usually cause the strongest shaking at the surface.</li>
+            <li><b>Time</b>All times are UTC.</li>
+          </ul>
+          <h3 style="margin-top:28px">Limits of this project</h3>
+          <ul class="limits">
+            <li>This is a map of past earthquakes. It cannot predict when or where the next one will happen, and it is not an early-warning system.</li>
+            <li>Early records are less certain. Before seismometer networks grew, small earthquakes went unrecorded, and locations and magnitudes carry larger errors. Counts over time reflect recording as well as seismic activity.</li>
+            <li>Magnitudes mix several types (Mw, mb, Ms) depending on the event and the era.</li>
+            <li>Fault traces are simplified and cover only faults that have been mapped.</li>
+            <li>The map draws no political boundaries. It shows seismic data, not a political map.</li>
+            <li>For official seismic zones and building codes, use the national agencies linked at left.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="flogo"><img src="assets/lpu-logo.png" alt="Lovely Professional University logo" hidden onload="this.hidden=false" onerror="this.remove()"></div>
+      <p><strong>Himalayan Earthquake Risk Explorer</strong> is an academic project developed at <strong>Lovely Professional University</strong>, Phagwara, Punjab, India.<span id="byline"></span></p>
+    </div>
+    <p>Earthquake data: U.S. Geological Survey. Fault data: GEM Foundation (CC BY-SA 4.0). Base map data: Natural Earth. This page is for education and does not replace official warnings.</p>
+  </div>
+  <div class="wrap fsmall"><p>Lovely Professional University, Phagwara, Punjab (India)</p></div>
+</footer>
+
+<div class="tip" id="tip" hidden role="tooltip"></div>
+
+<script src="data/config.js"></script>
+<script src="data/geo.js"></script>
+<script src="data/snapshots.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
